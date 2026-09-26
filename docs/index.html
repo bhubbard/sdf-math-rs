@@ -1124,6 +1124,29 @@
           N = normalize(∑ kᵢ · scene(p + kᵢ · ε))
         </div>
       </div>
+
+      <h2>Performance Benchmarks</h2>
+      <div class="card" style="border-left: 3px solid #3fb950; font-size: 0.8rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+          <span style="color: var(--text-bright); font-weight: 600;">3D Compound Eval:</span>
+          <span style="font-family: var(--font-mono); color: #3fb950;">2.73 ns (366M/s)</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+          <span style="color: var(--text-bright); font-weight: 600;">Raymarch Trace:</span>
+          <span style="font-family: var(--font-mono); color: #58a6ff;">0.22 µs (4.62M/s)</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+          <span style="color: var(--text-bright); font-weight: 600;">O(4) Normal Gradient:</span>
+          <span style="font-family: var(--font-mono); color: #3fb950;">9.94 ns (100M/s)</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
+          <span style="color: var(--text-bright); font-weight: 600;">2D Glyph Geometry:</span>
+          <span style="font-family: var(--font-mono); color: #ff7b72;">2.14 ns (466M/s)</span>
+        </div>
+        <div style="border-top: 1px solid var(--panel-border); padding-top: 0.5rem; text-align: right;">
+          <a href="https://github.com/bhubbard/sdf-math-rs/blob/main/BENCHMARKS.md" target="_blank" style="color: var(--accent-secondary); text-decoration: none; font-weight: 600; font-size: 0.75rem;">View Full Benchmarks Report &rarr;</a>
+        </div>
+      </div>
     </div>
   </div>
 
