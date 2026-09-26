@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sdf-math-rs | Signed Distance Fields & Ray Marching Visualizer</title>
+  <style>
+    :root {
+      --bg: #090d13;
+      --panel-bg: #121820;
+      --panel-border: #242d38;
+      --accent: #ff7b72;
+      --accent-secondary: #58a6ff;
+      --success: #3fb950;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --text-bright: #f0f6fc;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #0d1117;
+      border-bottom: 1px solid var(--panel-border);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand h1 {
+      font-size: 1.25rem;
+      color: var(--text-bright);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .badge {
+      background: rgba(255, 123, 114, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      margin-left: 1rem;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--accent-secondary); }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      flex: 1;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+
+    @media (max-width: 960px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+      }
+    }
+
+    .canvas-container {
+      position: relative;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .overlay-hud {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: rgba(18, 24, 32, 0.85);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(8px);
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      pointer-events: none;
+      line-height: 1.4;
+    }
+
+    .controls-panel {
+      background: var(--panel-bg);
+      border-left: 1px solid var(--panel-border);
+      padding: 1.25rem;
+      overflow-y: auto;
+    }
+
+    h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .card {
+      background: #18202b;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .tab-btn {
+      background: #242d38;
+      border: 1px solid transparent;
+      color: var(--text);
+      padding: 0.6rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: #2f3b4a;
+      border-color: var(--accent);
+      color: var(--text-bright);
+    }
+
+    .control-row {
+      margin-bottom: 0.85rem;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-bottom: 0.35rem;
+      color: var(--text-bright);
+    }
+
+    .control-val {
+      font-family: var(--font-mono);
+      color: var(--accent-secondary);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    select {
+      width: 100%;
+      padding: 0.45rem;
+      background: #090d13;
+      color: var(--text-bright);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .math-callout {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      background: #090d13;
+      padding: 0.6rem;
+      border-radius: 4px;
+      color: #79c0ff;
+      border-left: 2px solid var(--accent);
+      margin-top: 0.5rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div style="font-size: 1.4rem;">📐</div>
+      <div>
+        <h1>sdf-math-rs</h1>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">2D/3D Signed Distance Fields & Ray Marching Engine</span>
+      </div>
+      <span class="badge">Edition 2024</span>
+    </div>
+    <div class="nav-links">
+      <a href="https://github.com/bhubbard/sdf-math-rs" target="_blank">GitHub Repository</a>
+      <a href="https://iquilezles.org/articles/distfunctions/" target="_blank">Inigo Quilez Articles</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <div class="canvas-container">
+      <canvas id="sdfCanvas"></canvas>
+      <div class="overlay-hud" id="hud">
+        Mode: 3D Raymarching<br>
+        FPS: <span id="fpsVal">60</span><br>
+        Cursor: <span id="cursorPos">0.0, 0.0</span><br>
+        Distance: <span id="cursorDist">--</span>
+      </div>
+    </div>
+
+    <div class="controls-panel">
+      <div class="mode-tabs">
+        <button class="tab-btn active" id="tab3d" onclick="setMode('3d')">3D Ray Marching</button>
+        <button class="tab-btn" id="tab2d" onclick="setMode('2d')">2D Contour Field</button>
+      </div>
+
+      <!-- 3D Controls -->
+      <div id="controls3D">
+        <h2>3D Geometry & CSG</h2>
+        <div class="card">
+          <div class="control-row">
+            <div class="control-label">
+              <span>Primary Shape</span>
+            </div>
+            <select id="shape3d_1">
+              <option value="sphere">Sphere (r=1.0)</option>
+              <option value="box">Box3D (half-ext=0.8)</option>
+              <option value="rounded_box">Rounded Box (r=0.2)</option>
+              <option value="torus" selected>Torus (R=1.1, r=0.35)</option>
+              <option value="cylinder">Capped Cylinder (r=0.7, h=1.0)</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Secondary Shape</span>
+            </div>
+            <select id="shape3d_2">
+              <option value="sphere" selected>Sphere (r=0.85)</option>
+              <option value="box">Box3D (half-ext=0.7)</option>
+              <option value="capsule">Capsule3D (r=0.3)</option>
+              <option value="cone">Cone (r=0.9, h=1.4)</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>CSG Blend Mode</span>
+            </div>
+            <select id="csgMode">
+              <option value="smin" selected>Smooth Union (smin)</option>
+              <option value="union">Standard Union (min)</option>
+              <option value="subtraction">Smooth Subtraction (carve)</option>
+              <option value="intersection">Smooth Intersection</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Smooth Radius (k)</span>
+              <span class="control-val" id="kVal">0.45</span>
+            </div>
+            <input type="range" id="kSlider" min="0.0" max="1.5" step="0.02" value="0.45">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Twist Transform (k)</span>
+              <span class="control-val" id="twistVal">0.0</span>
+            </div>
+            <input type="range" id="twistSlider" min="-2.0" max="2.0" step="0.05" value="0.0">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Harmonic Noise</span>
+              <span class="control-val" id="noiseVal">0.0</span>
+            </div>
+            <input type="range" id="noiseSlider" min="0.0" max="0.3" step="0.01" value="0.0">
+          </div>
+        </div>
+
+        <h2>Lighting & Shading</h2>
+        <div class="card">
+          <div class="control-row">
+            <div class="control-label">
+              <span>Light Azimuth</span>
+              <span class="control-val" id="lightVal">45°</span>
+            </div>
+            <input type="range" id="lightSlider" min="0" max="360" step="1" value="45">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Ambient Occlusion</span>
+              <span class="control-val" id="aoVal">1.0</span>
+            </div>
+            <input type="range" id="aoSlider" min="0.0" max="2.0" step="0.1" value="1.0">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Soft Shadow Penumbra</span>
+              <span class="control-val" id="shadowVal">16.0</span>
+            </div>
+            <input type="range" id="shadowSlider" min="2.0" max="32.0" step="1.0" value="16.0">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2D Controls -->
+      <div id="controls2D" style="display: none;">
+        <h2>2D Signed Distance Field</h2>
+        <div class="card">
+          <div class="control-row">
+            <div class="control-label">
+              <span>2D Shape A</span>
+            </div>
+            <select id="shape2d_1">
+              <option value="circle">Circle (r=0.6)</option>
+              <option value="box" selected>Box2D (half-ext=0.6, 0.4)</option>
+              <option value="equilateral_triangle">Equilateral Triangle</option>
+              <option value="capsule">Capsule2D (r=0.25)</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>2D Shape B</span>
+            </div>
+            <select id="shape2d_2">
+              <option value="circle" selected>Circle (r=0.5)</option>
+              <option value="oriented_box">Oriented Box (Rotated)</option>
+              <option value="ring">Ring / Annulus</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Smooth Blend (k)</span>
+              <span class="control-val" id="k2dVal">0.30</span>
+            </div>
+            <input type="range" id="k2dSlider" min="0.0" max="1.0" step="0.02" value="0.30">
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>Contour Frequency</span>
+              <span class="control-val" id="contourVal">40</span>
+            </div>
+            <input type="range" id="contourSlider" min="10" max="80" step="2" value="40">
+          </div>
+
+          <div class="math-callout">
+            <strong>Inigo Quilez 2D Coloring:</strong><br>
+            d &gt; 0: Orange/Yellow bands<br>
+            d &lt; 0: Deep Cyan/Blue interior<br>
+            d = 0: Pure white isoline boundary
+          </div>
+        </div>
+      </div>
+
+      <h2>Inigo Quilez Formulation</h2>
+      <div class="card">
+        <div class="math-callout" style="border-left-color: var(--accent-secondary); color: #c9d1d9;">
+          <strong>Polynomial Smooth Minimum:</strong><br>
+          h = max(k - |a - b|, 0.0) / k<br>
+          smin(a, b, k) = min(a, b) - h² · k · 0.25
+        </div>
+        <div class="math-callout" style="border-left-color: var(--success); color: #c9d1d9;">
+          <strong>Tetrahedron Gradient (O(4)):</strong><br>
+          k₀=(1,-1,-1), k₁=(-1,-1,1)<br>
+          k₂=(-1,1,-1), k₃=(1,1,1)<br>
+          N = normalize(∑ kᵢ · scene(p + kᵢ · ε))
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Visualizer State
+    let mode = '3d';
+    const canvas = document.getElementById('sdfCanvas');
+    const gl = canvas.getContext('webgl');
+
+    let mouseX = 0, mouseY = 0;
+    let cameraRotX = 0.4, cameraRotY = 0.6;
+    let isMouseDown = false, lastMouseX = 0, lastMouseY = 0;
+
+    // WebGL Shaders for Ray Marching
+    const vsSource = `
+      attribute vec2 a_pos;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = a_pos;
+        gl_Position = vec4(a_pos, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `
+      precision highp float;
+      varying vec2 v_uv;
+      uniform vec2 u_res;
+      uniform float u_time;
+      uniform vec2 u_mouse;
+      uniform vec2 u_cam_rot;
+      uniform int u_mode; // 0: 3D raymarching, 1: 2D field
+      uniform int u_shape1;
+      uniform int u_shape2;
+      uniform int u_csg;
+      uniform float u_k;
+      uniform float u_twist;
+      uniform float u_noise;
+      uniform float u_light_angle;
+      uniform float u_ao;
+      uniform float u_shadow_k;
+      uniform float u_contour_freq;
+
+      // 2D distance functions
+      float sdCircle(vec2 p, float r) { return length(p) - r; }
+      float sdBox2D(vec2 p, vec2 b) {
+        vec2 d = abs(p) - b;
+        return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+      }
+      float sdEquilateralTriangle(vec2 p, float r) {
+        const float k = sqrt(3.0);
+        p.x = abs(p.x) - r;
+        p.y = p.y + r / k;
+        if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) * 0.5;
+        p.x -= clamp(p.x, -2.0 * r, 0.0);
+        return -length(p) * sign(p.y);
+      }
+      float sdCapsule2D(vec2 p, vec2 a, vec2 b, float r) {
+        vec2 pa = p - a, ba = b - a;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        return length(pa - ba * h) - r;
+      }
+
+      // 3D distance functions
+      float sdSphere(vec3 p, float r) { return length(p) - r; }
+      float sdBox3D(vec3 p, vec3 b) {
+        vec3 q = abs(p) - b;
+        return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+      }
+      float sdRoundedBox(vec3 p, vec3 b, float r) {
+        vec3 q = abs(p) - b + r;
+        return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+      }
+      float sdTorus(vec3 p, vec2 t) {
+        vec2 q = vec2(length(p.xz) - t.x, p.y);
+        return length(q) - t.y;
+      }
+      float sdCappedCylinder(vec3 p, float h, float r) {
+        vec2 d = abs(vec2(length(p.xz), p.y)) - vec2(r, h);
+        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+      }
+      float sdCapsule3D(vec3 p, vec3 a, vec3 b, float r) {
+        vec3 pa = p - a, ba = b - a;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        return length(pa - ba * h) - r;
+      }
+      float sdCone(vec3 p, float r, float h) {
+        vec2 q = vec2(length(p.xz), p.y);
+        vec2 tip = vec2(0.0, 0.0);
+        vec2 base = vec2(r, -h);
+        vec2 d1 = q - tip;
+        vec2 ba = base - tip;
+        float u = clamp(dot(d1, ba) / dot(ba, ba), 0.0, 1.0);
+        float side = length(d1 - ba * u);
+        float cap = length(q - vec2(clamp(q.x, 0.0, r), -h));
+        float dist = min(side, cap);
+        return (q.y <= 0.0 && q.y >= -h && (q.x * h + q.y * r <= 0.0)) ? -dist : dist;
+      }
+
+      // CSG & Ops
+      float smin(float a, float b, float k) {
+        if (k <= 0.001) return min(a, b);
+        float h = max(k - abs(a - b), 0.0) / k;
+        return min(a, b) - h * h * k * 0.25;
+      }
+      float smax(float a, float b, float k) {
+        if (k <= 0.001) return max(a, b);
+        float h = max(k - abs(a - b), 0.0) / k;
+        return max(a, b) + h * h * k * 0.25;
+      }
+
+      vec3 opTwist(vec3 p, float k) {
+        float c = cos(k * p.y);
+        float s = sin(k * p.y);
+        return vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
+      }
+
+      float map3D(vec3 p) {
+        if (abs(u_twist) > 0.001) p = opTwist(p, u_twist);
+
+        // Position shape 2 slightly offset and oscillating
+        vec3 p2 = p - vec3(sin(u_time * 1.2) * 0.7, cos(u_time * 0.9) * 0.4, 0.0);
+
+        float d1 = 0.0;
+        if (u_shape1 == 0) d1 = sdSphere(p, 1.0);
+        else if (u_shape1 == 1) d1 = sdBox3D(p, vec3(0.8));
+        else if (u_shape1 == 2) d1 = sdRoundedBox(p, vec3(0.8), 0.2);
+        else if (u_shape1 == 3) d1 = sdTorus(p, vec2(1.1, 0.35));
+        else if (u_shape1 == 4) d1 = sdCappedCylinder(p, 1.0, 0.7);
+
+        float d2 = 0.0;
+        if (u_shape2 == 0) d2 = sdSphere(p2, 0.85);
+        else if (u_shape2 == 1) d2 = sdBox3D(p2, vec3(0.7));
+        else if (u_shape2 == 2) d2 = sdCapsule3D(p2, vec3(0.0, -0.8, 0.0), vec3(0.0, 0.8, 0.0), 0.3);
+        else if (u_shape2 == 3) d2 = sdCone(p2, 0.9, 1.4);
+
+        float d = 0.0;
+        if (u_csg == 0) d = smin(d1, d2, u_k);
+        else if (u_csg == 1) d = min(d1, d2);
+        else if (u_csg == 2) d = smax(-d2, d1, u_k);
+        else if (u_csg == 3) d = smax(d1, d2, u_k);
+
+        if (u_noise > 0.001) {
+          d += u_noise * sin(6.0 * p.x) * sin(6.0 * p.y) * sin(6.0 * p.z);
+        }
+        return d;
+      }
+
+      // Tetrahedron normal estimation (Inigo Quilez)
+      vec3 calcNormal(vec3 p) {
+        vec2 e = vec2(1.0, -1.0) * 0.5773 * 0.001;
+        return normalize(
+          e.xyy * map3D(p + e.xyy) +
+          e.yyx * map3D(p + e.yyx) +
+          e.yxy * map3D(p + e.yxy) +
+          e.xxx * map3D(p + e.xxx)
+        );
+      }
+
+      float calcAO(vec3 p, vec3 n) {
+        float occ = 0.0;
+        float sca = 1.0;
+        for (int i = 1; i <= 5; i++) {
+          float h = 0.01 + 0.12 * float(i) / 4.0;
+          float d = map3D(p + h * n);
+          occ += (h - d) * sca;
+          sca *= 0.75;
+        }
+        return clamp(1.0 - 1.5 * occ * u_ao, 0.0, 1.0);
+      }
+
+      float calcSoftShadow(vec3 ro, vec3 rd, float mint, float maxt, float k) {
+        float res = 1.0;
+        float t = mint;
+        for (int i = 0; i < 32; i++) {
+          if (t >= maxt) break;
+          float h = map3D(ro + rd * t);
+          if (h < 0.001) return 0.0;
+          res = min(res, k * h / t);
+          t += clamp(h, 0.02, 0.2);
+        }
+        return clamp(res, 0.0, 1.0);
+      }
+
+      // 2D distance field rendering with Inigo Quilez color scheme
+      vec3 render2D(vec2 p) {
+        float d1 = (u_shape1 == 0) ? sdCircle(p, 0.6) :
+                   (u_shape1 == 1) ? sdBox2D(p, vec2(0.6, 0.4)) :
+                   (u_shape1 == 2) ? sdEquilateralTriangle(p, 0.6) :
+                   sdCapsule2D(p, vec2(-0.5, 0.0), vec2(0.5, 0.0), 0.25);
+
+        vec2 p2 = p - vec2(sin(u_time * 0.8) * 0.6, cos(u_time * 0.6) * 0.3);
+        float d2 = (u_shape2 == 0) ? sdCircle(p2, 0.5) :
+                   (u_shape2 == 1) ? sdBox2D(p2, vec2(0.4, 0.5)) :
+                   abs(length(p2) - 0.5) - 0.1;
+
+        float d = smin(d1, d2, u_k);
+
+        // Inigo Quilez distance field coloring:
+        vec3 col = (d > 0.0) ? vec3(0.9, 0.6, 0.3) : vec3(0.65, 0.85, 1.0);
+        col *= 1.0 - exp(-6.0 * abs(d));
+        col *= 0.8 + 0.2 * cos(u_contour_freq * d - u_time * 3.0);
+        col = mix(col, vec3(1.0), 1.0 - smoothstep(0.0, 0.015, abs(d)));
+
+        // Mouse tangent circle
+        vec2 m = u_mouse;
+        float dm = smin(
+          (u_shape1 == 0) ? sdCircle(m, 0.6) : sdBox2D(m, vec2(0.6, 0.4)),
+          sdCircle(m - vec2(sin(u_time * 0.8) * 0.6, cos(u_time * 0.6) * 0.3), 0.5),
+          u_k
+        );
+        float dCursor = length(p - m) - abs(dm);
+        col = mix(col, vec3(1.0, 1.0, 0.0), 1.0 - smoothstep(0.0, 0.008, abs(dCursor)));
+        col = mix(col, vec3(1.0, 0.2, 0.2), 1.0 - smoothstep(0.0, 0.03, length(p - m)));
+
+        return col;
+      }
+
+      void main() {
+        vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / min(u_res.x, u_res.y);
+
+        if (u_mode == 1) {
+          // 2D Contour
+          vec3 col = render2D(uv * 2.5);
+          gl_FragColor = vec4(col, 1.0);
+          return;
+        }
+
+        // 3D Raymarching
+        float rad = u_light_angle * 3.14159265 / 180.0;
+        vec3 lightPos = vec3(4.0 * cos(rad), 5.0, 4.0 * sin(rad));
+
+        // Camera setup
+        float dist = 4.2;
+        vec3 ro = vec3(
+          dist * sin(u_cam_rot.x) * cos(u_cam_rot.y),
+          dist * sin(u_cam_rot.y),
+          dist * cos(u_cam_rot.x) * cos(u_cam_rot.y)
+        );
+        vec3 ta = vec3(0.0, 0.0, 0.0);
+        vec3 ww = normalize(ta - ro);
+        vec3 uu = normalize(cross(ww, vec3(0.0, 1.0, 0.0)));
+        vec3 vv = normalize(cross(uu, ww));
+        vec3 rd = normalize(uv.x * uu + uv.y * vv + 1.8 * ww);
+
+        // Ray march
+        float t = 0.01;
+        float tmax = 20.0;
+        float d = 0.0;
+        vec3 col = vec3(0.04, 0.06, 0.09); // dark space bg
+
+        for (int i = 0; i < 96; i++) {
+          vec3 p = ro + rd * t;
+          d = map3D(p);
+          if (d < 0.001 || t > tmax) break;
+          t += d;
+        }
+
+        if (t < tmax) {
+          vec3 pos = ro + rd * t;
+          vec3 nor = calcNormal(pos);
+          vec3 lightDir = normalize(lightPos - pos);
+
+          float diff = max(dot(nor, lightDir), 0.0);
+          float ao = calcAO(pos, nor);
+          float shadow = calcSoftShadow(pos + nor * 0.02, lightDir, 0.02, 8.0, u_shadow_k);
+
+          // IQ Material coloring based on normal & position
+          vec3 matCol = vec3(0.85, 0.45, 0.35) + 0.2 * sin(vec3(0.0, 1.0, 2.0) + pos.y * 2.0);
+          vec3 amb = vec3(0.12, 0.16, 0.22) * ao;
+          vec3 diffuse = matCol * diff * shadow * ao;
+
+          // Specular
+          vec3 hal = normalize(lightDir - rd);
+          float spec = pow(max(dot(nor, hal), 0.0), 32.0) * diff * shadow;
+
+          col = amb + diffuse + vec3(spec * 0.6);
+        }
+
+        // Gamma correction
+        col = pow(col, vec3(0.4545));
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `;
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    // Quad geometry
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1, 1, -1, -1, 1,
+      -1, 1, 1, -1, 1, 1
+    ]), gl.STATIC_DRAW);
+
+    const posAttr = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(posAttr);
+    gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
+
+    // Uniform locations
+    const uRes = gl.getUniformLocation(program, "u_res");
+    const uTime = gl.getUniformLocation(program, "u_time");
+    const uMouse = gl.getUniformLocation(program, "u_mouse");
+    const uCamRot = gl.getUniformLocation(program, "u_cam_rot");
+    const uMode = gl.getUniformLocation(program, "u_mode");
+    const uShape1 = gl.getUniformLocation(program, "u_shape1");
+    const uShape2 = gl.getUniformLocation(program, "u_shape2");
+    const uCsg = gl.getUniformLocation(program, "u_csg");
+    const uK = gl.getUniformLocation(program, "u_k");
+    const uTwist = gl.getUniformLocation(program, "u_twist");
+    const uNoise = gl.getUniformLocation(program, "u_noise");
+    const uLightAngle = gl.getUniformLocation(program, "u_light_angle");
+    const uAo = gl.getUniformLocation(program, "u_ao");
+    const uShadowK = gl.getUniformLocation(program, "u_shadow_k");
+    const uContourFreq = gl.getUniformLocation(program, "u_contour_freq");
+
+    window.setMode = function(m) {
+      mode = m;
+      document.getElementById('tab3d').className = m === '3d' ? 'tab-btn active' : 'tab-btn';
+      document.getElementById('tab2d').className = m === '2d' ? 'tab-btn active' : 'tab-btn';
+      document.getElementById('controls3D').style.display = m === '3d' ? 'block' : 'none';
+      document.getElementById('controls2D').style.display = m === '2d' ? 'block' : 'none';
+      document.getElementById('hud').childNodes[0].nodeValue = `Mode: ${m === '3d' ? '3D Raymarching' : '2D Contour Field'}\n`;
+    };
+
+    // UI Linkages
+    const shapeMap3D = { sphere: 0, box: 1, rounded_box: 2, torus: 3, cylinder: 4 };
+    const shapeMap3D_2 = { sphere: 0, box: 1, capsule: 2, cone: 3 };
+    const shapeMap2D = { circle: 0, box: 1, equilateral_triangle: 2, capsule: 3 };
+    const shapeMap2D_2 = { circle: 0, oriented_box: 1, ring: 2 };
+    const csgMap = { smin: 0, union: 1, subtraction: 2, intersection: 3 };
+
+    document.getElementById('kSlider').oninput = (e) => document.getElementById('kVal').textContent = e.target.value;
+    document.getElementById('twistSlider').oninput = (e) => document.getElementById('twistVal').textContent = e.target.value;
+    document.getElementById('noiseSlider').oninput = (e) => document.getElementById('noiseVal').textContent = e.target.value;
+    document.getElementById('lightSlider').oninput = (e) => document.getElementById('lightVal').textContent = e.target.value + '°';
+    document.getElementById('aoSlider').oninput = (e) => document.getElementById('aoVal').textContent = e.target.value;
+    document.getElementById('shadowSlider').oninput = (e) => document.getElementById('shadowVal').textContent = e.target.value;
+    document.getElementById('k2dSlider').oninput = (e) => document.getElementById('k2dVal').textContent = e.target.value;
+    document.getElementById('contourSlider').oninput = (e) => document.getElementById('contourVal').textContent = e.target.value;
+
+    // Mouse Interaction
+    canvas.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => isMouseDown = false);
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
+      const y = -(((e.clientY - rect.top) / canvas.clientHeight) * 2 - 1);
+      mouseX = x;
+      mouseY = y;
+      document.getElementById('cursorPos').textContent = `${x.toFixed(2)}, ${y.toFixed(2)}`;
+
+      if (isMouseDown && mode === '3d') {
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+        cameraRotX += dx * 0.01;
+        cameraRotY = Math.max(-1.4, Math.min(1.4, cameraRotY + dy * 0.01));
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      }
+    });
+
+    let lastTime = 0;
+    let frameCount = 0;
+    let fps = 60;
+
+    function render(timeMs) {
+      const timeSec = timeMs * 0.001;
+      frameCount++;
+      if (timeMs - lastTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = timeMs;
+        document.getElementById('fpsVal').textContent = fps;
+      }
+
+      // Resize
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.floor(canvas.clientWidth * dpr);
+      const h = Math.floor(canvas.clientHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        gl.viewport(0, 0, w, h);
+      }
+
+      gl.useProgram(program);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uTime, timeSec);
+      gl.uniform2f(uMouse, mouseX, mouseY);
+      gl.uniform2f(uCamRot, cameraRotX, cameraRotY);
+      gl.uniform1i(uMode, mode === '3d' ? 0 : 1);
+
+      if (mode === '3d') {
+        gl.uniform1i(uShape1, shapeMap3D[document.getElementById('shape3d_1').value]);
+        gl.uniform1i(uShape2, shapeMap3D_2[document.getElementById('shape3d_2').value]);
+        gl.uniform1i(uCsg, csgMap[document.getElementById('csgMode').value]);
+        gl.uniform1f(uK, parseFloat(document.getElementById('kSlider').value));
+        gl.uniform1f(uTwist, parseFloat(document.getElementById('twistSlider').value));
+        gl.uniform1f(uNoise, parseFloat(document.getElementById('noiseSlider').value));
+        gl.uniform1f(uLightAngle, parseFloat(document.getElementById('lightSlider').value));
+        gl.uniform1f(uAo, parseFloat(document.getElementById('aoSlider').value));
+        gl.uniform1f(uShadowK, parseFloat(document.getElementById('shadowSlider').value));
+      } else {
+        gl.uniform1i(uShape1, shapeMap2D[document.getElementById('shape2d_1').value]);
+        gl.uniform1i(uShape2, shapeMap2D_2[document.getElementById('shape2d_2').value]);
+        gl.uniform1f(uK, parseFloat(document.getElementById('k2dSlider').value));
+        gl.uniform1f(uContourFreq, parseFloat(document.getElementById('contourSlider').value));
+      }
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
